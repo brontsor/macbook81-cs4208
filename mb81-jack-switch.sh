@@ -1,56 +1,45 @@
 #!/bin/bash
 # mb81-jack-switch — MacBook8,1 (CS4208) headphone-jack auto-switch.
 #
-# WHY THIS EXISTS
-# ---------------
-# The CS4208's headphone DAC (codec converter 0x02) and the TDM speaker
-# converter (0x0a) collide on the same HDA stream tag. Opening the headphone
-# output grabs the tag the speaker is using, so the codec stops routing the
-# speaker's DMA to the class-D amp and the speaker goes silent (headphones play
-# fine). The raw speaker node is pinned open (the cold-boot fix:
-# session.suspend-timeout-seconds=0 / node.pause-on-idle=false), so it never
-# closes and re-claims a clean tag on its own.
+# The codec path is the 0x02-only prepare in macbook81-cs4208. A headphone
+# open must not rewrite converter 0x0a. This watcher only moves the route.
+# It does not restart WirePlumber. That restart was the old workaround for
+# the tag clobber, and it left the playing stream on the headphone nick.
 #
-# Normal PipeWire/WirePlumber jack switching is also unavailable here because the
-# card runs in raw-PCM mode (api.alsa.use-acp = false) for the custom 4-channel
-# TDM speaker device — there are no ACP ports/routes to drive auto-switching.
+# The card runs in raw-PCM mode, so PipeWire has no ACP jack route.
+#   plugged   -> default and playing streams = headphone PCM
+#   unplugged -> default and playing streams = speaker EQ
 #
-# So this watcher reacts to the ALSA "Headphone Jack" control directly:
-#   plugged   -> default sink = headphone analog output
-#   unplugged -> re-prepare the speaker (restart WirePlumber, which closes and
-#                reopens the raw speaker PCM so converter 0x0a gets a clean tag)
-#                then default sink = speaker EQ
+# Do not move the EQ chain's own stream. Its media.name is
+# "MacBook Speaker (EQ) output" and its target is MacBook_Speaker_Raw.
 #
-# Runs as a systemd --user service (it needs the user's PipeWire/WirePlumber bus).
-# Overridable via env: MB81_CARD_ID, MB81_HP_SINK, MB81_SPK_SINK.
+# Runs as a systemd --user service. Overridable via env:
+# MB81_CARD_ID, MB81_HP_SINK, MB81_SPK_SINK.
 
 set -u
 
-CARD_ID="${MB81_CARD_ID:-PCH}"   # /proc/asound id of the CS4208 controller
+CARD_ID="${MB81_CARD_ID:-PCH}"
 HP_SINK="${MB81_HP_SINK:-alsa_output.pci-0000_00_1b.0.playback.0.0}"
 SPK_SINK="${MB81_SPK_SINK:-input.MacBook_Speaker}"
+EQ_MEDIA="MacBook Speaker (EQ) output"
 
 log() { printf 'mb81-jack-switch: %s\n' "$*"; }
 
-# ALSA card index for the CS4208 (e.g. "HDA Intel PCH" -> 0).
 card_index() {
     awk -v id="$CARD_ID" '$0 ~ ("HDA Intel " id "$") {print $1; exit}' \
         /proc/asound/cards
 }
 
-# numid of the "Headphone Jack" boolean control on card $1.
 jack_numid() {
     amixer -c "$1" controls 2>/dev/null \
         | sed -n "s/numid=\([0-9]*\).*name='Headphone Jack'.*/\1/p" | head -1
 }
 
-# Jack state on card $1, control $2: prints "on" (plugged) or "off" (unplugged).
 jack_state() {
     amixer -c "$1" cget numid="$2" 2>/dev/null \
         | sed -n 's/.*: values=\(on\|off\).*/\1/p' | head -1
 }
 
-# Set the default audio sink by node.name (same metadata key wpctl writes).
 set_default() {
     pw-metadata -n default 0 default.configured.audio.sink \
         "{ \"name\": \"$1\" }" >/dev/null 2>&1
@@ -60,24 +49,57 @@ node_exists() {
     pw-cli ls Node 2>/dev/null | grep -q "node.name = \"$1\""
 }
 
-apply() {  # $1 = on|off
-    if [[ "$1" == on ]]; then
-        log "headphones plugged -> $HP_SINK"
-        set_default "$HP_SINK"
-    else
-        log "headphones unplugged -> re-prepare speaker + $SPK_SINK"
-        # Restarting WirePlumber closes and reopens the raw speaker PCM so the
-        # codec converter 0x0a re-claims a free stream tag (the tag clobber the
-        # headphone output caused cannot be undone any other way while the node
-        # is pinned open). This is the proven recovery.
-        systemctl --user restart wireplumber
-        # Wait for the raw speaker node to be recreated before pinning default.
-        for _ in $(seq 1 24); do
-            node_exists "$SPK_SINK" && break
-            sleep 0.25
-        done
-        set_default "$SPK_SINK"
+# Move application streams onto $1. Skip the EQ chain's internal link.
+move_streams() {
+    local sink="$1" id="" media="" app="" line
+    while IFS= read -r line; do
+        case "$line" in
+            *"Sink Input #"*)
+                if [[ -n "$id" && "$media" != "$EQ_MEDIA" ]]; then
+                    if pactl move-sink-input "$id" "$sink" >/dev/null 2>&1; then
+                        log "moved $id (${app:-stream}) -> $sink"
+                    else
+                        log "move $id (${app:-stream}) -> $sink failed"
+                    fi
+                fi
+                id="${line##*#}"
+                media=""
+                app=""
+                ;;
+            *"media.name = "*)
+                media="${line#*\"}"
+                media="${media%%\"*}"
+                ;;
+            *"application.name = "*)
+                app="${line#*\"}"
+                app="${app%%\"*}"
+                ;;
+        esac
+    done < <(pactl list sink-inputs 2>/dev/null)
+    if [[ -n "$id" && "$media" != "$EQ_MEDIA" ]]; then
+        if pactl move-sink-input "$id" "$sink" >/dev/null 2>&1; then
+            log "moved $id (${app:-stream}) -> $sink"
+        else
+            log "move $id (${app:-stream}) -> $sink failed"
+        fi
     fi
+}
+
+apply() {  # $1 = on|off
+    local sink
+    if [[ "$1" == on ]]; then
+        sink="$HP_SINK"
+        log "headphones plugged -> $sink"
+    else
+        sink="$SPK_SINK"
+        log "headphones unplugged -> $sink"
+    fi
+    for _ in $(seq 1 24); do
+        node_exists "$sink" && break
+        sleep 0.25
+    done
+    set_default "$sink"
+    move_streams "$sink"
 }
 
 CARD="$(card_index)"
@@ -86,16 +108,8 @@ NUMID="$(jack_numid "$CARD")"
 [[ -z "$NUMID" ]] && { log "Headphone Jack control not found on card $CARD; exiting"; exit 1; }
 log "watching card $CARD 'Headphone Jack' (numid=$NUMID)"
 
-# Startup: align the default sink with the current jack state WITHOUT a
-# re-prepare. The speaker already works at boot, and a WirePlumber restart here
-# would bounce audio on every login/service-start. The re-prepare only runs on
-# an actual unplug *transition* below.
-#
-# The filter-chain sink (input.MacBook_Speaker) is registered slightly later
-# than the raw alsa_output sink at login. Setting the default before it exists
-# is silently dropped and WirePlumber falls back to the analog output — so wait
-# for whichever sink we're about to select, same as the unplug path does.
 last="$(jack_state "$CARD" "$NUMID")"
+[[ -z "$last" ]] && { log "jack state unreadable; exiting"; exit 1; }
 case "$last" in
     on) startup_sink="$HP_SINK" ;;
     *)  startup_sink="$SPK_SINK" ;;
@@ -106,10 +120,8 @@ for _ in $(seq 1 24); do
 done
 log "startup: $([ "$last" = on ] && echo headphones || echo speakers) -> $startup_sink"
 set_default "$startup_sink"
+move_streams "$startup_sink"
 
-# React to control changes. alsactl emits a line on every control event on the
-# card; re-read the jack and act only when its state actually changed. (The pipe
-# runs the loop in a subshell, which keeps its own copy of $last across events.)
 alsactl monitor "hw:$CARD" 2>/dev/null | while read -r _; do
     s="$(jack_state "$CARD" "$NUMID")"
     [[ -z "$s" || "$s" == "$last" ]] && continue
@@ -117,6 +129,5 @@ alsactl monitor "hw:$CARD" 2>/dev/null | while read -r _; do
     apply "$s"
 done
 
-# alsactl monitor exited (card gone / suspend); let systemd restart us.
 log "alsactl monitor exited"
 exit 1

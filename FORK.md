@@ -1,16 +1,26 @@
 # Fork
 
-This project starts from
-https://github.com/omnidecker/macbook8.1-speaker-driver
+Upstream is https://github.com/omnidecker/macbook8.1-speaker-driver
 commit `e4134fb272ba3be29aa71ad7aa6eae8b0ebddf1a`.
 
-The DKMS package name in this tree is `macbook81-cs4208`, version `0.1`.
-It is not `macbook12-audio`. Do not install it over that package.
-`AUTOINSTALL` is `no` because the build downloads a kernel tarball.
-That flag does not stop a pacman DKMS hook once a `dkms.conf` is left
-in `/usr/src`. This tree is not in `/usr/src`.
+This tree is the installable fork. The DKMS package name is
+`macbook81-cs4208`, version `0.1`. Version stays `0.1` until a
+deliberate reinstall. The installed source link is
+`/usr/src/macbook81-cs4208-0.1`. Bumping the version without that
+reinstall points DKMS at a directory that does not exist.
 
-Kernel files in `patch_cirrus/` are GPL-2.0-or-later, as marked.
-`LICENSE` is that text.
+`AUTOINSTALL=no` because the build downloads a kernel tarball. That
+flag does not stop a pacman DKMS hook once `dkms.conf` is left in
+`/usr/src`. Remove the link on uninstall. `dkms remove` alone can
+leave it, and the hook builds every `dkms.conf` it finds.
 
-The README below the fork note is the upstream README at that commit.
+The first release on top of the import is the headphone fix: the
+`0x02`-only prepare, the jack switch that moves the playing stream,
+and the output names. 48 kHz and 24-bit are not in this tree's
+published files. Unfinished capture scripts live in `local/` and are
+not published.
+
+Kernel files in `patch_cirrus/` are GPL-2.0-or-later. `LICENSE` is
+that text.
+
+Do not install this beside `macbook12-audio`.

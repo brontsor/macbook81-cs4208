@@ -1,5 +1,11 @@
 # How the MacBook8,1 speaker fix works
 
+Fork note. The headphone fix in this tree is not a WirePlumber restart.
+A headphone open must not write converter `0x0a`. That is the
+`0x02`-only prepare. The jack watcher only moves the playing stream.
+The rest of this file is the upstream account of the EFI clock and
+amplifier bugs.
+
 This is the long version: what was actually wrong, how it was diagnosed, and how
 each of the four parts of the fix addresses one specific failure. If you just
 want to install it, see [`README.md`](README.md).

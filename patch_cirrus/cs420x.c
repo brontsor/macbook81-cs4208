@@ -884,6 +884,24 @@ static int cs_mb81_build_pcms(struct hda_codec *codec)
 
 	/* Add a second PCM for TDM speaker output (MB81 only) */
 	if (spec->is_macbook81) {
+		struct hda_pcm *analog = spec->gen.pcm_rec[0];
+
+		/*
+		 * The generic analog prepare walks every DAC in the parsed
+		 * path, including converter 0x0a. A headphone open then writes
+		 * the headphone stream and format onto the speaker converter.
+		 * This prepare touches 0x02 only. The TDM PCM still owns 0x0a.
+		 */
+		if (analog) {
+			analog->stream[SNDRV_PCM_STREAM_PLAYBACK].nid = 0x02;
+			analog->stream[SNDRV_PCM_STREAM_PLAYBACK].ops.open =
+				cs_4208_playback_pcm_open;
+			analog->stream[SNDRV_PCM_STREAM_PLAYBACK].ops.prepare =
+				cs_4208_playback_pcm_prepare;
+			analog->stream[SNDRV_PCM_STREAM_PLAYBACK].ops.cleanup =
+				cs_4208_playback_pcm_cleanup;
+		}
+
 		tdm_info = snd_hda_codec_pcm_new(codec, "CS4208 Speaker");
 		if (!tdm_info)
 			return -ENOMEM;

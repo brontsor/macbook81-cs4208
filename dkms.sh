@@ -34,13 +34,18 @@ refresh_initramfs() {
         echo "deferring initramfs refresh (MB81_SKIP_INITRAMFS=1)"
         return 0
     fi
-    if ! command -v update-initramfs > /dev/null; then
-        echo "WARNING: no update-initramfs found. Refresh the initramfs by hand,"
-        echo "         or the rebuilt modules will NOT be the ones used at boot."
+    if command -v limine-mkinitcpio > /dev/null; then
+        echo "=== refreshing boot image with limine-mkinitcpio ==="
+        limine-mkinitcpio || exit 1
         return 0
     fi
+    if ! command -v update-initramfs > /dev/null; then
+        echo "ERROR: neither limine-mkinitcpio nor update-initramfs is installed."
+        echo "       The rebuilt modules will NOT be the ones used at boot."
+        exit 1
+    fi
     echo "=== refreshing initramfs (so new modules + softdep reach boot) ==="
-    update-initramfs -u -k all
+    update-initramfs -u -k all || exit 1
 }
 
 if [[ $dkms_remove = true ]]; then

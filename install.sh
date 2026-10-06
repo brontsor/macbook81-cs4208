@@ -28,6 +28,12 @@ action='install'
 
 [[ $EUID -ne 0 ]] && { echo "must be root: sudo bash $0 ${1:-}"; exit 1; }
 
+if [[ $action == 'install' ]] && dkms status 2>/dev/null | grep -q '^macbook12-audio'; then
+    echo "ERROR: macbook12-audio is installed. It ships the same three modules."
+    echo "       Remove it before installing macbook81-cs4208. This script will not."
+    exit 1
+fi
+
 # Resolve the invoking (non-root) user so the PipeWire/WirePlumber configs land
 # in their per-user config dirs, not root's.
 real_user="${SUDO_USER:-$USER}"
@@ -44,23 +50,23 @@ user_systemctl() {
         systemctl --user "$@"
 }
 
-# Rebuild the initramfs. Both the patched modules and mb81-singlecmd.conf (the
-# cs420x softdep) are baked into it, and neither `dkms install` nor a plain
-# `cp` into /etc/modprobe.d updates it — Ubuntu's DKMS defaults REMAKE_INITRD
-# to "no". Skipping this leaves the machine booting a stale initrd: an old
-# generic linking against a new cs420x ("disagrees about version of symbol
-# snd_hda_gen_spec_init", err -22) and no softdep, so generic wins the codec
-# bind and the speaker is silent even though the card looks healthy.
-# Kept identical to dkms.sh's copy; install.sh runs it once at the end, with
-# MB81_SKIP_INITRAMFS=1 suppressing the nested one.
+# Rebuild the boot image. The patched modules and mb81-singlecmd.conf are
+# baked into it. dkms install does not refresh it. On Omarchy that refresh
+# is limine-mkinitcpio, not limine-update. update-initramfs is the other
+# path. Skipping this leaves the next boot on the previous image.
 refresh_initramfs() {
-    echo "=== refreshing initramfs (so new modules + softdep reach boot) ==="
-    if command -v update-initramfs > /dev/null; then
-        update-initramfs -u -k all
-    else
-        echo "WARNING: no update-initramfs found. Refresh the initramfs by hand,"
-        echo "         or the installed modules will NOT be the ones used at boot."
+    echo "=== refreshing boot image (so new modules + softdep reach boot) ==="
+    if command -v limine-mkinitcpio > /dev/null; then
+        limine-mkinitcpio || exit 1
+        return
     fi
+    if command -v update-initramfs > /dev/null; then
+        update-initramfs -u -k all || exit 1
+        return
+    fi
+    echo "ERROR: neither limine-mkinitcpio nor update-initramfs is installed."
+    echo "       The modules on disk will not be the ones used at boot."
+    exit 1
 }
 
 if [[ $action == 'remove' ]]; then
