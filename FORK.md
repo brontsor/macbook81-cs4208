@@ -1,7 +1,12 @@
 # Fork
 
 Upstream is https://github.com/omnidecker/macbook8.1-speaker-driver
-commit `e4134fb272ba3be29aa71ad7aa6eae8b0ebddf1a`.
+commit `e4134fb272ba3be29aa71ad7aa6eae8b0ebddf1a`. That repository
+is a fork of
+https://github.com/thomas-shirley/macbook8.1-speaker-driver.
+Its README credits davidjo/snd_hda_macbookpro and
+leifliddy/macbook12-audio-driver. leifliddy's driver does not
+support MacBook8,1. Name that chain in the published README.
 
 This tree is the installable fork. The DKMS package name is
 `macbook81-cs4208`, version `0.1`. Version stays `0.1` until a

@@ -4,7 +4,7 @@ Internal speakers and headphone switching for the MacBook (Retina, 12-inch, Earl
 
 The codec is a Cirrus Logic CS4208. The speakers are a 4-channel TDM stream into an external amplifier, not the ordinary analog headphone DAC. Stock Linux detects the chip and does not play those speakers. This package does.
 
-This is a fork of [omnidecker/macbook8.1-speaker-driver](https://github.com/omnidecker/macbook8.1-speaker-driver) at `e4134fb272ba3be29aa71ad7aa6eae8b0ebddf1a`. The package name is `macbook81-cs4208`, version `0.1`. It is not `macbook12-audio`. Do not install both. They ship the same three modules.
+This is a fork of [omnidecker/macbook8.1-speaker-driver](https://github.com/omnidecker/macbook8.1-speaker-driver) at `e4134fb272ba3be29aa71ad7aa6eae8b0ebddf1a`, which is itself a fork of [thomas-shirley/macbook8.1-speaker-driver](https://github.com/thomas-shirley/macbook8.1-speaker-driver). That tree credits [davidjo/snd_hda_macbookpro](https://github.com/davidjo/snd_hda_macbookpro) and [leifliddy/macbook12-audio-driver](https://github.com/leifliddy/macbook12-audio-driver). leifliddy's driver does not support MacBook8,1. The package name is `macbook81-cs4208`, version `0.1`. It is not `macbook12-audio`. Do not install both. They ship the same three modules.
 
 This release adds the headphone fix. A headphone open no longer writes its stream onto the speaker converter, and unplugging the jack moves the playing stream back to the speakers. It does not restart WirePlumber. 48 kHz and 24-bit are not in this release. The speakers stay at 44.1 kHz, 16-bit.
 
