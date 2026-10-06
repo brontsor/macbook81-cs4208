@@ -43,6 +43,10 @@ sudo reboot
 | `mb81-jack-switch` | Moves the playing stream when the headphone jack changes |
 | `mb81-resume-recover` | Workaround after a resume that leaves the amp dead |
 
+Speaker names and the EQ chain are not this package. They are
+`macbook81-audio-profile`. This installer does not copy them and does
+not remove them.
+
 The resume script is a workaround. It is not the headphone fix. A reboot is the clean fallback if resume audio is dead.
 
 ## For agents

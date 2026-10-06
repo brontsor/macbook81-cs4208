@@ -5,12 +5,10 @@
 #   (A) snd-hda-intel     — no-reset attach to the live EFI link
 #   (C) snd-hda-codec-cs420x — EFI coef image + TDM prepare sync-dance fix
 #   (D) snd-hda-codec-generic — CS4208 input-path + init_digital skip (clock latch)
-# plus the three runtime config files:
+# plus the runtime config:
 #   (B) mb81-singlecmd.conf  -> /etc/modprobe.d/   (single_cmd=1, reliable enum)
-#       51-macbook81-speaker.conf -> ~/.config/pipewire/pipewire.conf.d/  (EQ chain)
-#       51-mb81-rawpcm-speaker.conf -> ~/.config/wireplumber/wireplumber.conf.d/
-#           (raw-PCM mode: WirePlumber creates MacBook_Speaker_Raw for device 2
-#            event-driven so it survives the cold-boot timing race)
+# The speaker names and the EQ chain are not this package. They are
+# macbook81-audio-profile, installed per user, without root.
 # plus the suspend/resume recovery (S3 resume re-latches the codec clock; a bound
 # driver cannot clear it, so audio returns silent):
 #       resume_recover.sh + efi_recover.py -> /usr/local/bin/
@@ -34,13 +32,9 @@ if [[ $action == 'install' ]] && dkms status 2>/dev/null | grep -q '^macbook12-a
     exit 1
 fi
 
-# Resolve the invoking (non-root) user so the PipeWire/WirePlumber configs land
-# in their per-user config dirs, not root's.
+# The invoking user, so the jack watcher is enabled on their session bus.
 real_user="${SUDO_USER:-$USER}"
-real_home="$(getent passwd "$real_user" | cut -d: -f6)"
 real_uid="$(id -u "$real_user")"
-pw_dir="$real_home/.config/pipewire/pipewire.conf.d"
-wp_dir="$real_home/.config/wireplumber/wireplumber.conf.d"
 
 # Run `systemctl --user` as the invoking user, against their session bus.
 user_systemctl() {
@@ -85,9 +79,8 @@ if [[ $action == 'remove' ]]; then
     MB81_SKIP_INITRAMFS=1 bash dkms.sh -r || true
     echo "=== removing config files ==="
     rm -f /etc/modprobe.d/mb81-singlecmd.conf
-    rm -f "$pw_dir/51-macbook81-speaker.conf"
-    rm -f "$wp_dir/51-mb81-rawpcm-speaker.conf"
-    rm -f "$wp_dir/51-mb81-disable-iec958.conf"   # legacy name (pre raw-PCM)
+    # Speaker names and the EQ chain belong to macbook81-audio-profile.
+    # Do not remove that user's files from this driver uninstall.
     depmod -a
     refresh_initramfs
     echo "DONE. Reboot to fall back to the stock in-tree drivers."
@@ -96,16 +89,6 @@ fi
 
 echo "=== (B) modprobe.d: single_cmd=1 ==="
 install -m 0644 mb81-singlecmd.conf /etc/modprobe.d/mb81-singlecmd.conf
-
-echo "=== PipeWire EQ sink + WirePlumber raw-PCM speaker (user: $real_user) ==="
-install -d -o "$real_user" -g "$real_user" "$pw_dir" "$wp_dir"
-install -m 0644 -o "$real_user" -g "$real_user" \
-    51-macbook81-speaker.conf "$pw_dir/51-macbook81-speaker.conf"
-install -m 0644 -o "$real_user" -g "$real_user" \
-    51-mb81-rawpcm-speaker.conf "$wp_dir/51-mb81-rawpcm-speaker.conf"
-# Remove the legacy iec958-disable rule if a previous install left it (its job
-# is now folded into 51-mb81-rawpcm-speaker.conf, which disables device 1).
-rm -f "$wp_dir/51-mb81-disable-iec958.conf"
 
 echo "=== headphone jack auto-switch (user service) ==="
 install -m 0755 mb81-jack-switch.sh /usr/local/bin/mb81-jack-switch
@@ -149,6 +132,6 @@ echo
 echo "================================================================"
 echo "DONE. The patched snd-hda-intel autoloads at a normal boot and"
 echo "attaches to the live EFI link without reset; CS4208 enumerates"
-echo "via single_cmd, and the speaker plays through input.MacBook_Speaker."
-echo "Reboot to activate."
+echo "via single_cmd. Speaker names and the EQ chain are a separate"
+echo "package, macbook81-audio-profile. Reboot to activate."
 echo "================================================================"
