@@ -82,7 +82,11 @@ if [[ $action == 'remove' ]]; then
     # Speaker names and the EQ chain belong to macbook81-audio-profile.
     # Do not remove that user's files from this driver uninstall.
     depmod -a
-    refresh_initramfs
+    if [[ "${MB81_SKIP_INITRAMFS:-}" == "1" ]]; then
+        echo "=== boot image refresh deferred ==="
+    else
+        refresh_initramfs
+    fi
     echo "DONE. Reboot to fall back to the stock in-tree drivers."
     exit 0
 fi
@@ -122,11 +126,15 @@ for kdir in /lib/modules/*/updates; do
 done
 
 echo "=== (A/C/D) building + installing the three modules via DKMS ==="
-# Defer dkms.sh's own refresh so the initramfs is rebuilt exactly once, below,
-# after both the modules and mb81-singlecmd.conf are in place.
+# Defer dkms.sh's own refresh. This script rebuilds once below, unless
+# the caller set MB81_SKIP_INITRAMFS=1 to batch that rebuild.
 MB81_SKIP_INITRAMFS=1 bash dkms.sh
 depmod -a
-refresh_initramfs
+if [[ "${MB81_SKIP_INITRAMFS:-}" == "1" ]]; then
+    echo "=== boot image refresh deferred ==="
+else
+    refresh_initramfs
+fi
 
 echo
 echo "================================================================"
