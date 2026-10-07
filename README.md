@@ -18,11 +18,11 @@ sudo bash install.sh
 sudo reboot
 ```
 
-`install.sh` registers the DKMS package, installs the PipeWire and WirePlumber configs for the user who invoked sudo, installs the headphone jack watcher, and rebuilds the Limine UKI with `limine-mkinitcpio`. Do not run `limine-update`. That reinstalls the bootloader and is not this step.
+`install.sh` registers the DKMS package, installs the headphone jack watcher for the user who invoked sudo, and rebuilds the Limine UKI with `limine-mkinitcpio`. Do not run `limine-update`. That reinstalls the bootloader and is not this step.
 
 If `macbook12-audio` is already installed, the script stops. Remove that package first. This script will not remove it for you.
 
-After reboot, play real audio through `input.MacBook_Speaker`. Do not use `speaker-test`. Plug and unplug headphones while something is playing. The stream should move both ways, and the menu should not be required.
+After reboot, play real audio. Do not use `speaker-test`. Plug and unplug headphones while something is playing. The stream should move both ways, and the menu should not be required.
 
 ## Uninstall
 
@@ -39,7 +39,6 @@ sudo reboot
 | `single_cmd=1` | Enumerates the codec on the immediate-command path |
 | `snd-hda-codec-cs420x` | Writes the EFI coefficient image and the 44.1 kHz TDM prepare |
 | `snd-hda-codec-generic` | Skips the input-path bring-up that latches the clock |
-| PipeWire / WirePlumber configs | EQ sink and the raw speaker node |
 | `mb81-jack-switch` | Moves the playing stream when the headphone jack changes |
 | `mb81-resume-recover` | Workaround after a resume that leaves the amp dead |
 
