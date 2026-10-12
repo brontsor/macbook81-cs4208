@@ -36,28 +36,31 @@ hda_dir="$build_dir/hda"
 [[ -d $hda_dir ]] && rm -rf $hda_dir
 [[ ! -d $build_dir ]] && mkdir $build_dir
 
-# The build needs the kernel's hda source tree to compile the patched codecs
-# against. Normally that comes from the matching mainline tarball on kernel.org.
-# Ubuntu-versioned kernels (e.g. 26.04's "7.0.0") have NO mainline release there,
-# so fall back to the Ubuntu linux-source-<ver> package, which ships the exact
-# ABI-matched tree as /usr/src/linux-source-<ver>.tar.bz2.
-kernel_src_archive=''
-kernel_src_topdir=''
-
-# attempt to download linux-x.x.x.tar.xz, then linux-x.x.tar.xz, from kernel.org
-if wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P $build_dir; then
-    kernel_src_archive="$build_dir/linux-$kernel_version.tar.xz"
-    kernel_src_topdir="linux-$kernel_version"
-elif wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_short_version.tar.xz" -P $build_dir; then
-    kernel_src_archive="$build_dir/linux-$kernel_short_version.tar.xz"
-    kernel_src_topdir="linux-$kernel_short_version"
+# The installed headers tree is the compile target. It does not contain
+# the codec sources. Those come from the matching kernel.org tarball.
+# Fetch it with wget, or with curl if wget is absent. A missing wget is
+# not a missing tarball. apt-get is only for a distribution that has it,
+# and only after the download itself fails.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$here/kernel-src.sh"
+resolve_rc=0
+resolved=$(resolve_kernel_src "$build_dir" "$kernel_version" "$kernel_short_version" "$major_version") || resolve_rc=$?
+if [[ $resolve_rc -eq 0 ]]; then
+    kernel_src_archive=$(printf '%s\n' "$resolved" | sed -n '1p')
+    kernel_src_topdir=$(printf '%s\n' "$resolved" | sed -n '2p')
+elif [[ $resolve_rc -eq 3 ]]; then
+    kernel_src_archive=''
+else
+    exit 1
 fi
 
-# No mainline tarball (Ubuntu-versioned kernel): use the Ubuntu linux-source pkg.
+# Download failed on a distribution that has apt-get. Ubuntu-versioned
+# kernels have no mainline tarball; the linux-source package has the tree.
 if [[ -z $kernel_src_archive ]]; then
     src_pkg="linux-source-$kernel_version"
     pkg_tarball="/usr/src/$src_pkg.tar.bz2"
-    echo "=== kernel.org has no linux-$kernel_version; falling back to Ubuntu $src_pkg ==="
+    echo "=== download failed; falling back to Ubuntu $src_pkg ==="
     # Reuse an already-installed tarball if present; only touch apt when missing.
     # (An apt-triggered DKMS rebuild already holds the dpkg lock, so pre-installing
     # linux-source-$ver yourself avoids a self-deadlock in that path.)

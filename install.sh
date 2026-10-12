@@ -136,6 +136,10 @@ else
     refresh_initramfs
 fi
 
+# shellcheck disable=SC1091
+source "$here/kernel-src.sh"
+require_installed "macbook81-cs4208/0.1" "$(uname -r)" || exit 1
+
 echo
 echo "================================================================"
 echo "DONE. The patched snd-hda-intel autoloads at a normal boot and"

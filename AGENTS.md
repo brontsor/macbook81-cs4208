@@ -21,6 +21,12 @@ Installable speaker package for MacBook8,1 on Omarchy. Package name
   it, and do not describe it as part of the install.
 - Playback checks use real audio. Do not use `speaker-test`. Do not
   raise the volume for a first listen.
+- The codec sources are not in the installed headers tree. Fetch the
+  matching kernel.org tarball with wget, or with curl if wget is
+  absent. A missing wget is not a missing tarball. Do not fall back
+  to apt-get on Omarchy. `dkms.sh` must exit non-zero if `dkms install`
+  fails. `install.sh` must not print DONE unless `dkms status` says
+  installed for the running kernel.
 - Do not push or add a remote unless asked.
 - A decision that should outlive a session goes on the workshop audio
   page, not in a recap here.

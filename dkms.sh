@@ -1,8 +1,10 @@
 #!/bin/bash
 
-src_dir='/usr/src/macbook81-cs4208-0.1'
+src_dir="${MB81_DKMS_SRC:-/usr/src/macbook81-cs4208-0.1}"
 dkms_name='macbook81-cs4208/0.1'
-var_dkms_dir='/var/lib/dkms/macbook81-cs4208'
+var_dkms_dir="${MB81_DKMS_VAR:-/var/lib/dkms/macbook81-cs4208}"
+dkms_remove=false
+set -eu
 cur_dir=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
 
 # specify uninstall with the -r or -u argument
