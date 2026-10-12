@@ -116,5 +116,8 @@ set -e
 [[ $rc -eq 1 ]] || fail "another kernel was treated as this kernel"
 grep -q 'require_installed "macbook81-cs4208/0.1" "$(uname -r)" || exit 1' \
     install.sh || fail "DONE is not gated on dkms status"
+confirm_line=$(grep -n 'require_installed "macbook81-cs4208/0.1"' install.sh | head -1 | cut -d: -f1)
+refresh_line=$(grep -n '^[[:space:]]*refresh_initramfs$' install.sh | tail -1 | cut -d: -f1)
+[[ $confirm_line -lt $refresh_line ]] || fail "boot image refresh is not after the dkms confirm"
 
 echo "kernel-src tests passed"

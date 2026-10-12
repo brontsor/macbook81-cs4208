@@ -130,15 +130,18 @@ echo "=== (A/C/D) building + installing the three modules via DKMS ==="
 # the caller set MB81_SKIP_INITRAMFS=1 to batch that rebuild.
 MB81_SKIP_INITRAMFS=1 bash dkms.sh
 depmod -a
+
+# Confirm before the boot image. A direct run must not refresh it
+# unless dkms status says installed for the running kernel.
+# shellcheck disable=SC1091
+source "$here/kernel-src.sh"
+require_installed "macbook81-cs4208/0.1" "$(uname -r)" || exit 1
+
 if [[ "${MB81_SKIP_INITRAMFS:-}" == "1" ]]; then
     echo "=== boot image refresh deferred ==="
 else
     refresh_initramfs
 fi
-
-# shellcheck disable=SC1091
-source "$here/kernel-src.sh"
-require_installed "macbook81-cs4208/0.1" "$(uname -r)" || exit 1
 
 echo
 echo "================================================================"
