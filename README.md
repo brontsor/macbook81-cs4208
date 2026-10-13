@@ -48,6 +48,18 @@ not remove them.
 
 The resume script is a workaround. It is not the headphone fix. A reboot is the clean fallback if resume audio is dead.
 
+## Changes
+
+The latest only. Older releases are in [CHANGELOG.md](CHANGELOG.md).
+
+### [v0.1.2](https://github.com/brontsor/macbook81-cs4208/releases/tag/v0.1.2)
+
+- The README states the headphone reconnect fix. A headphone open does not write its stream onto the speaker converter. The jack switch moves a stream that is already playing. It does not restart WirePlumber.
+- 48 kHz and 24-bit are not in this release. The speakers stay at 44.1 kHz, 16-bit.
+- A missing codec tarball fails the build. wget is tried first. If wget is absent, curl fetches the same tarball. A missing wget is not a missing tarball.
+- `install.sh` does not rebuild the boot image, and does not print DONE, unless `dkms status` says `macbook81-cs4208/0.1` is installed for the running kernel.
+- Tested on 12 October 2026 on a scratch MacBook (Retina, 12-inch, Early 2015), product name MacBook8,1, running the Omarchy Edge channel, kernel `7.2.8-5-omarchy-bore`. The loaded speaker module on that boot was this package.
+
 ## For agents
 
 Read `AGENTS.md` before changing this tree. Read `FORK.md` for what this fork is and what it is not. Read `HOW_IT_WORKS.md` for the codec failure modes. `local/` is unfinished work and is not part of the install.
